@@ -1,6 +1,7 @@
 import dotenv from 'dotenv'
-import express, { Request, Response } from 'express'
+import express, { Request, Response, NextFunction } from 'express'
 import { Pool } from "pg"
+import bcrypt from 'bcrypt'
 
 import path from 'path'
 
@@ -31,10 +32,82 @@ const initDB = async () => {
 
 initDB().catch(console.error)
 
-app.get('/', (req: Request, res: Response) => {
+//logger middleware
+
+const logger = (req: Request, res: Response, next: NextFunction) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`)
+  next()
+}
+
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+app.post('/v1/auth/signup', async (req: Request, res: Response) => {
+  try {
+    const { name, email, password, phone, role } = req.body
+
+    // Validate required fields
+    if (!name || !email || !password || !phone || !role) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields are required'
+      })
+    }
+
+    // Validate role
+    if (role !== 'admin' && role !== 'customer') {
+      return res.status(400).json({
+        success: false,
+        message: 'Role must be either "admin" or "customer"'
+      })
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Insert user into database
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password, phone, role) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, name, email, phone, role`,
+      [name, email.toLowerCase(), hashedPassword, phone, role]
+    )
+    console.log(result.rows[0])
+
+    const user = result.rows[0]
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      data: user
+    })
+  } catch (error: any) {
+    // Handle unique constraint violation (duplicate email)
+    if (error.code === '23505') {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already exists'
+      })
+    }
+
+    console.error('Signup error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    })
+  }
+})
+
+app.get('/', logger, (req: Request, res: Response) => {
   res.send('Hello World!!')
 })
 
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  })
+})
 
 
 app.listen(port, () => {
