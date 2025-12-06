@@ -29,7 +29,7 @@ const getVehicles = async (req: Request, res: Response) => {
 
 const getVehicleById = async (req: Request, res: Response) => {
     try {
-        const vehicleId = parseInt(req.params.vehicleId)
+        const vehicleId = parseInt(req.params.vehicleId as string)
         
         if (isNaN(vehicleId)) {
             return res.status(400).json({
@@ -63,7 +63,7 @@ const getVehicleById = async (req: Request, res: Response) => {
 
 const updateVehicle = async (req: Request, res: Response) => {
     try {
-        const vehicleId = parseInt(req.params.vehicleId)
+        const vehicleId = parseInt(req.params.vehicleId as string)
         
         if (isNaN(vehicleId)) {
             return res.status(400).json({
