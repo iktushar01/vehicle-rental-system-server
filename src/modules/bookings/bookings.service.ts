@@ -98,10 +98,108 @@ const getBookingsByCustomerId = async (customerId: number) => {
     )
 }
 
+const getBookingById = async (bookingId: number) => {
+    return await pool.query('SELECT * FROM bookings WHERE id = $1', [bookingId])
+}
+
+const updateBookingStatus = async (bookingId: number, status: string, vehicleId: number) => {
+    // Start a transaction
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        // Update booking status
+        const bookingResult = await client.query(
+            `UPDATE bookings 
+             SET status = $1, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2 
+             RETURNING *`,
+            [status, bookingId]
+        );
+        
+        // If status is cancelled or returned, update vehicle to available
+        if (status === 'cancelled' || status === 'returned') {
+            await client.query(
+                'UPDATE vehicles SET availability_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                ['available', vehicleId]
+            );
+        }
+        
+        await client.query('COMMIT');
+        
+        return bookingResult.rows[0];
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+const getBookingWithVehicleStatus = async (bookingId: number) => {
+    return await pool.query(
+        `SELECT 
+            b.*,
+            v.availability_status
+         FROM bookings b
+         INNER JOIN vehicles v ON b.vehicle_id = v.id
+         WHERE b.id = $1`,
+        [bookingId]
+    )
+}
+
+const autoReturnExpiredBookings = async () => {
+    // Auto-return bookings where rent_end_date has passed and status is still 'active'
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        // Get all active bookings that have passed their end date
+        const expiredBookings = await client.query(
+            `SELECT id, vehicle_id 
+             FROM bookings 
+             WHERE status = 'active' 
+             AND rent_end_date < CURRENT_DATE`
+        );
+        
+        // Update each expired booking and its vehicle
+        for (const booking of expiredBookings.rows) {
+            await client.query(
+                `UPDATE bookings 
+                 SET status = 'returned', updated_at = CURRENT_TIMESTAMP 
+                 WHERE id = $1`,
+                [booking.id]
+            );
+            
+            await client.query(
+                `UPDATE vehicles 
+                 SET availability_status = 'available', updated_at = CURRENT_TIMESTAMP 
+                 WHERE id = $1`,
+                [booking.vehicle_id]
+            );
+        }
+        
+        await client.query('COMMIT');
+        
+        return expiredBookings.rows.length;
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
 export const bookingsService = {
     getVehicleById,
     createBooking,
     getBookingWithVehicle,
     getAllBookings,
-    getBookingsByCustomerId
+    getBookingsByCustomerId,
+    getBookingById,
+    updateBookingStatus,
+    getBookingWithVehicleStatus,
+    autoReturnExpiredBookings
 }

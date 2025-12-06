@@ -143,6 +143,9 @@ const getBookings = async (req: Request, res: Response) => {
             })
         }
 
+        // Auto-return expired bookings before fetching
+        await bookingsService.autoReturnExpiredBookings();
+
         const isAdmin = currentUser.role === 'admin';
         const customerId = Number(currentUser.id);
 
@@ -207,7 +210,175 @@ const getBookings = async (req: Request, res: Response) => {
     }
 }
 
+const updateBooking = async (req: Request, res: Response) => {
+    try {
+        const bookingId = parseInt(req.params.bookingId || '')
+        
+        if (isNaN(bookingId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid booking ID'
+            })
+        }
+
+        // Check if request body exists
+        if (!req.body || Object.keys(req.body).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Request body is required'
+            })
+        }
+
+        const { status } = req.body;
+
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                message: 'Status is required'
+            })
+        }
+
+        // Validate status values
+        const validStatuses = ['active', 'cancelled', 'returned'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Status must be one of: ${validStatuses.join(', ')}`
+            })
+        }
+
+        // Check if booking exists
+        const bookingResult = await bookingsService.getBookingById(bookingId);
+        if (bookingResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            })
+        }
+
+        const booking = bookingResult.rows[0];
+
+        // Check authorization
+        const currentUser = req.user;
+        if (!currentUser || !currentUser.id) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized'
+            })
+        }
+
+        const isAdmin = currentUser.role === 'admin';
+        const isOwnBooking = Number(currentUser.id) === booking.customer_id;
+
+        // Role-based access control
+        if (status === 'cancelled') {
+            // Only customer can cancel their own booking
+            if (!isOwnBooking) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden: You can only cancel your own bookings'
+                })
+            }
+            if (isAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden: Admins cannot cancel bookings'
+                })
+            }
+        } else if (status === 'returned') {
+            // Only admin can mark as returned
+            if (!isAdmin) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Forbidden: Only admins can mark bookings as returned'
+                })
+            }
+        } else if (status === 'active') {
+            // Cannot change back to active
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot change booking status back to active'
+            })
+        }
+
+        // Check if booking is already in the requested status
+        if (booking.status === status) {
+            return res.status(400).json({
+                success: false,
+                message: `Booking is already ${status}`
+            })
+        }
+
+        // Update booking status (this also updates vehicle status if cancelled or returned)
+        const updatedBooking = await bookingsService.updateBookingStatus(
+            bookingId,
+            status,
+            booking.vehicle_id
+        );
+
+        // Prepare response based on status
+        if (status === 'cancelled') {
+            res.status(200).json({
+                success: true,
+                message: 'Booking cancelled successfully',
+                data: {
+                    id: updatedBooking.id,
+                    customer_id: updatedBooking.customer_id,
+                    vehicle_id: updatedBooking.vehicle_id,
+                    rent_start_date: updatedBooking.rent_start_date,
+                    rent_end_date: updatedBooking.rent_end_date,
+                    total_price: parseFloat(updatedBooking.total_price),
+                    status: updatedBooking.status
+                }
+            })
+        } else if (status === 'returned') {
+            // Get vehicle status for response
+            const bookingWithVehicle = await bookingsService.getBookingWithVehicleStatus(bookingId);
+            
+            res.status(200).json({
+                success: true,
+                message: 'Booking marked as returned. Vehicle is now available',
+                data: {
+                    id: updatedBooking.id,
+                    customer_id: updatedBooking.customer_id,
+                    vehicle_id: updatedBooking.vehicle_id,
+                    rent_start_date: updatedBooking.rent_start_date,
+                    rent_end_date: updatedBooking.rent_end_date,
+                    total_price: parseFloat(updatedBooking.total_price),
+                    status: updatedBooking.status,
+                    vehicle: {
+                        availability_status: bookingWithVehicle.rows[0].availability_status
+                    }
+                }
+            })
+        }
+    } catch (error: any) {
+        console.error('Update booking error:', error)
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            detail: error.detail,
+            stack: error.stack
+        })
+        
+        // Handle check constraint violations
+        if (error.code === '23514') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid data: Check constraint violation'
+            })
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        })
+    }
+}
+
 export const bookingsController = {
     createBooking,
-    getBookings
+    getBookings,
+    updateBooking
 }
