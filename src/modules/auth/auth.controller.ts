@@ -1,6 +1,9 @@
 import type { Request, Response } from 'express'
 import { authService } from './auth.service'
 import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+import { config } from '../../config'
+
 const signup = async (req: Request, res: Response) => {
     try {
       const { name, email, password, phone, role } = req.body
@@ -53,6 +56,73 @@ const signup = async (req: Request, res: Response) => {
   }
 
 
+const signin = async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body
+
+      // Validate required fields
+      if (!email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email and password are required'
+        })
+      }
+
+      // Get user from database
+      const result = await authService.signin(email.toLowerCase(), password)
+
+      if (result.rows.length === 0) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password'
+        })
+      }
+
+      const user = result.rows[0]
+
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, user.password)
+
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid email or password'
+        })
+      }
+
+      // Remove password from response
+      const { password: _, ...userWithoutPassword } = user
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { 
+          id: user.id, 
+          email: user.email, 
+          role: user.role 
+        },
+        config.jwtSecret as string,
+        { expiresIn: '7d' }
+      )
+
+      res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        data: {
+          token,
+          user: userWithoutPassword
+        }
+      })
+    } catch (error: any) {
+      console.error('Login error:', error)
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      })
+    }
+  }
+
+
   export const authController = {
-    signup
+    signup,
+    signin
   }
