@@ -1,5 +1,7 @@
 import { pool } from "../../config/db";
 import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+import { config } from '../../config'
 
 const hashedPassword = (password: string) => bcrypt.hash(password, 10)
 
@@ -19,7 +21,20 @@ const signin = async (email: string, password: string) => {
   )
 }
 
+const generateToken = (userId: number, email: string, role: string): string => {
+  return jwt.sign(
+    { 
+      id: userId, 
+      email: email, 
+      role: role 
+    },
+    config.jwtSecret as string,
+    { expiresIn: '7d' }
+  )
+}
+
   export const authService = {
     signup,
-    signin
+    signin,
+    generateToken
   }

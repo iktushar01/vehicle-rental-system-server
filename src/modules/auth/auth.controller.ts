@@ -1,8 +1,6 @@
 import type { Request, Response } from 'express'
 import { authService } from './auth.service'
 import bcrypt from 'bcrypt'
-import jwt from 'jsonwebtoken'
-import { config } from '../../config'
 
 const signup = async (req: Request, res: Response) => {
     try {
@@ -94,15 +92,7 @@ const signin = async (req: Request, res: Response) => {
       const { password: _, ...userWithoutPassword } = user
 
       // Generate JWT token
-      const token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email, 
-          role: user.role 
-        },
-        config.jwtSecret as string,
-        { expiresIn: '7d' }
-      )
+      const token = authService.generateToken(user.id, user.email, user.role)
 
       res.status(200).json({
         success: true,
