@@ -63,8 +63,23 @@ const updateUser = async (userId: number, userData: {
     return result.rows[0];
 }
 
+const hasActiveBookings = async (userId: number) => {
+    const result = await pool.query(
+        'SELECT COUNT(*) as count FROM bookings WHERE customer_id = $1 AND status = $2',
+        [userId, 'active']
+    );
+    return parseInt(result.rows[0].count) > 0;
+}
+
+const deleteUser = async (userId: number) => {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
+    return result.rows[0];
+}
+
 export const usersService = {
     getUsers,
     getUserById,
-    updateUser
+    updateUser,
+    hasActiveBookings,
+    deleteUser
 }

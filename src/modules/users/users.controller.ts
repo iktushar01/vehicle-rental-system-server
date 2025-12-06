@@ -167,7 +167,61 @@ const updateUser = async (req: Request, res: Response) => {
     }
 }
 
+const deleteUser = async (req: Request, res: Response) => {
+    try {
+        const userId = parseInt(req.params.userId || '')
+        
+        if (isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            })
+        }
+
+        // Check if user exists
+        const existingUser = await usersService.getUserById(userId);
+        if (existingUser.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            })
+        }
+
+        // Check if user has active bookings
+        const hasActive = await usersService.hasActiveBookings(userId);
+        if (hasActive) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot delete user with active bookings'
+            })
+        }
+
+        // Delete the user
+        await usersService.deleteUser(userId);
+
+        res.status(200).json({
+            success: true,
+            message: 'User deleted successfully'
+        })
+    } catch (error: any) {
+        console.error('Delete user error:', error)
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            detail: error.detail,
+            stack: error.stack
+        })
+        
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        })
+    }
+}
+
 export const usersController = {
     getUsers,
-    updateUser
+    updateUser,
+    deleteUser
 }
