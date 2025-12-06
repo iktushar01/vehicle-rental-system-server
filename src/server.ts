@@ -5,6 +5,7 @@ import logger from './middleware/logger'
 import { authRoutes } from './modules/auth/auth.routes'
 import { usersRoutes } from './modules/users/users.routes'
 import { vehiclesRoutes } from './modules/vehicles/vehicles.routes'
+import { bookingsRoutes } from './modules/bookings/bookings.routes'
 
 
 const app = express()
@@ -21,6 +22,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use('/v1/auth', authRoutes)
 app.use('/v1/users', usersRoutes)
 app.use('/v1/vehicles', vehiclesRoutes)
+app.use('/v1/bookings', bookingsRoutes)
 
 app.get('/', logger, (req: Request, res: Response) => {
   res.send('Hello World!!')
