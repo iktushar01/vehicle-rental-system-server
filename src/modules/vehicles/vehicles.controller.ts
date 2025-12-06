@@ -61,6 +61,116 @@ const getVehicleById = async (req: Request, res: Response) => {
     }
 }
 
+const updateVehicle = async (req: Request, res: Response) => {
+    try {
+        const vehicleId = parseInt(req.params.vehicleId)
+        
+        if (isNaN(vehicleId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid vehicle ID'
+            })
+        }
+
+        // Check if vehicle exists
+        const existingVehicle = await vehiclesService.getVehicleById(vehicleId)
+        if (existingVehicle.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Vehicle not found'
+            })
+        }
+
+        const { vehicle_name, type, registration_number, daily_rent_price, availability_status } = req.body;
+
+        // Check if at least one field is provided
+        if (!vehicle_name && !type && registration_number === undefined && daily_rent_price === undefined && !availability_status) {
+            return res.status(400).json({
+                success: false,
+                message: 'At least one field must be provided for update'
+            })
+        }
+
+        // Build update object with only provided fields
+        const updateData: {
+            vehicle_name?: string;
+            type?: string;
+            registration_number?: string;
+            daily_rent_price?: number;
+            availability_status?: string;
+        } = {};
+
+        if (vehicle_name !== undefined) {
+            updateData.vehicle_name = vehicle_name;
+        }
+        if (type !== undefined) {
+            const validTypes = ['car', 'bike', 'van', 'SUV'];
+            if (!validTypes.includes(type)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Type must be one of: ${validTypes.join(', ')}`
+                })
+            }
+            updateData.type = type;
+        }
+        if (registration_number !== undefined) {
+            updateData.registration_number = registration_number;
+        }
+        if (daily_rent_price !== undefined) {
+            const price = Number(daily_rent_price);
+            if (isNaN(price) || price <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Daily rent price must be a positive number'
+                })
+            }
+            updateData.daily_rent_price = price;
+        }
+        if (availability_status !== undefined) {
+            const validStatuses = ['available', 'booked'];
+            if (!validStatuses.includes(availability_status)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Availability status must be one of: ${validStatuses.join(', ')}`
+                })
+            }
+            updateData.availability_status = availability_status;
+        }
+
+        const result = await vehiclesService.updateVehicle(vehicleId, updateData)
+
+        res.status(200).json({
+            success: true,
+            message: 'Vehicle updated successfully',
+            data: result
+        })
+    } catch (error: any) {
+        console.error('Update vehicle error:', error)
+        
+        // Handle unique constraint violation
+        if (error.code === '23505') {
+            return res.status(409).json({
+                success: false,
+                message: 'Registration number already exists'
+            })
+        }
+
+        // Handle check constraint violations
+        if (error.code === '23514') {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid data: Check constraint violation'
+            })
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        })
+    }
+}
+
 const createVehicle = async (req: Request, res: Response) => {
     try {
         const { vehicle_name, type, registration_number, daily_rent_price, availability_status } = req.body;
@@ -143,6 +253,7 @@ const createVehicle = async (req: Request, res: Response) => {
 export const vehiclesController = {
     getVehicles,
     getVehicleById,
+    updateVehicle,
     createVehicle
 }
 
