@@ -133,6 +133,81 @@ const createBooking = async (req: Request, res: Response) => {
     }
 }
 
+const getBookings = async (req: Request, res: Response) => {
+    try {
+        const currentUser = req.user;
+        if (!currentUser || !currentUser.id) {
+            return res.status(401).json({
+                success: false,
+                message: 'Unauthorized'
+            })
+        }
+
+        const isAdmin = currentUser.role === 'admin';
+        const customerId = Number(currentUser.id);
+
+        let result;
+        let bookings;
+
+        if (isAdmin) {
+            // Admin sees all bookings with customer and vehicle details
+            result = await bookingsService.getAllBookings();
+            bookings = result.rows.map(booking => ({
+                id: booking.id,
+                customer_id: booking.customer_id,
+                vehicle_id: booking.vehicle_id,
+                rent_start_date: booking.rent_start_date,
+                rent_end_date: booking.rent_end_date,
+                total_price: parseFloat(booking.total_price),
+                status: booking.status,
+                customer: {
+                    name: booking.customer_name,
+                    email: booking.customer_email
+                },
+                vehicle: {
+                    vehicle_name: booking.vehicle_name,
+                    registration_number: booking.registration_number
+                }
+            }));
+
+            res.status(200).json({
+                success: true,
+                message: 'Bookings retrieved successfully',
+                data: bookings
+            })
+        } else {
+            // Customer sees only their own bookings with vehicle details
+            result = await bookingsService.getBookingsByCustomerId(customerId);
+            bookings = result.rows.map(booking => ({
+                id: booking.id,
+                vehicle_id: booking.vehicle_id,
+                rent_start_date: booking.rent_start_date,
+                rent_end_date: booking.rent_end_date,
+                total_price: parseFloat(booking.total_price),
+                status: booking.status,
+                vehicle: {
+                    vehicle_name: booking.vehicle_name,
+                    registration_number: booking.registration_number,
+                    type: booking.type
+                }
+            }));
+
+            res.status(200).json({
+                success: true,
+                message: 'Your bookings retrieved successfully',
+                data: bookings
+            })
+        }
+    } catch (error: any) {
+        console.error('Get bookings error:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        })
+    }
+}
+
 export const bookingsController = {
-    createBooking
+    createBooking,
+    getBookings
 }

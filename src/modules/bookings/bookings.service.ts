@@ -57,8 +57,51 @@ const getBookingWithVehicle = async (bookingId: number) => {
     )
 }
 
+const getAllBookings = async () => {
+    return await pool.query(
+        `SELECT 
+            b.id,
+            b.customer_id,
+            b.vehicle_id,
+            b.rent_start_date,
+            b.rent_end_date,
+            b.total_price,
+            b.status,
+            u.name as customer_name,
+            u.email as customer_email,
+            v.vehicle_name,
+            v.registration_number
+         FROM bookings b
+         INNER JOIN users u ON b.customer_id = u.id
+         INNER JOIN vehicles v ON b.vehicle_id = v.id
+         ORDER BY b.created_at DESC`
+    )
+}
+
+const getBookingsByCustomerId = async (customerId: number) => {
+    return await pool.query(
+        `SELECT 
+            b.id,
+            b.vehicle_id,
+            b.rent_start_date,
+            b.rent_end_date,
+            b.total_price,
+            b.status,
+            v.vehicle_name,
+            v.registration_number,
+            v.type
+         FROM bookings b
+         INNER JOIN vehicles v ON b.vehicle_id = v.id
+         WHERE b.customer_id = $1
+         ORDER BY b.created_at DESC`,
+        [customerId]
+    )
+}
+
 export const bookingsService = {
     getVehicleById,
     createBooking,
-    getBookingWithVehicle
+    getBookingWithVehicle,
+    getAllBookings,
+    getBookingsByCustomerId
 }
