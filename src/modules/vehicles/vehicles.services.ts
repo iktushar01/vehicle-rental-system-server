@@ -1,5 +1,9 @@
 import { pool } from "../../config/db"
 
+const getVehicles = async () => {
+    return await pool.query('SELECT * FROM vehicles ORDER BY created_at DESC')
+}
+
 const createVehicle = async (vehicleData: {
     vehicle_name: string;
     type: string;
@@ -18,6 +22,7 @@ const createVehicle = async (vehicleData: {
 }
 
 export const vehiclesService = {
+    getVehicles,
     createVehicle
 }
 
