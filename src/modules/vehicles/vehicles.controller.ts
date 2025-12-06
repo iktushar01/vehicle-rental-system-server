@@ -27,6 +27,40 @@ const getVehicles = async (req: Request, res: Response) => {
     }
 }
 
+const getVehicleById = async (req: Request, res: Response) => {
+    try {
+        const vehicleId = parseInt(req.params.vehicleId)
+        
+        if (isNaN(vehicleId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid vehicle ID'
+            })
+        }
+
+        const result = await vehiclesService.getVehicleById(vehicleId)
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Vehicle not found'
+            })
+        }
+        
+        res.status(200).json({
+            success: true,
+            message: 'Vehicle retrieved successfully',
+            data: result.rows[0]
+        })
+    } catch (error: any) {
+        console.error('Get vehicle by ID error:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        })
+    }
+}
+
 const createVehicle = async (req: Request, res: Response) => {
     try {
         const { vehicle_name, type, registration_number, daily_rent_price, availability_status } = req.body;
@@ -108,6 +142,7 @@ const createVehicle = async (req: Request, res: Response) => {
 
 export const vehiclesController = {
     getVehicles,
+    getVehicleById,
     createVehicle
 }
 

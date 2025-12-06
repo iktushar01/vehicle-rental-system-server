@@ -4,6 +4,10 @@ const getVehicles = async () => {
     return await pool.query('SELECT * FROM vehicles ORDER BY created_at DESC')
 }
 
+const getVehicleById = async (vehicleId: number) => {
+    return await pool.query('SELECT * FROM vehicles WHERE id = $1', [vehicleId])
+}
+
 const createVehicle = async (vehicleData: {
     vehicle_name: string;
     type: string;
@@ -23,6 +27,7 @@ const createVehicle = async (vehicleData: {
 
 export const vehiclesService = {
     getVehicles,
+    getVehicleById,
     createVehicle
 }
 
