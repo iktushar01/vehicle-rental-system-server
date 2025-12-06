@@ -27,8 +27,6 @@ const signup = async (req: Request, res: Response) => {
   
       // Insert user into database
       const result = await authService.signup(name, email, hashedPassword, phone, role)
-      console.log(result.rows[0])
-  
       const user = result.rows[0]
   
       res.status(201).json({
@@ -67,7 +65,7 @@ const signin = async (req: Request, res: Response) => {
       }
 
       // Get user from database
-      const result = await authService.signin(email.toLowerCase(), password)
+      const result = await authService.signin(email)
 
       if (result.rows.length === 0) {
         return res.status(401).json({
