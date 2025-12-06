@@ -250,10 +250,64 @@ const createVehicle = async (req: Request, res: Response) => {
     }
 }
 
+const deleteVehicle = async (req: Request, res: Response) => {
+    try {
+        const vehicleId = parseInt(req.params.vehicleId || '')
+        
+        if (isNaN(vehicleId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid vehicle ID'
+            })
+        }
+
+        // Check if vehicle exists
+        const existingVehicle = await vehiclesService.getVehicleById(vehicleId);
+        if (existingVehicle.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Vehicle not found'
+            })
+        }
+
+        // Check if vehicle has active bookings
+        const hasActive = await vehiclesService.hasActiveBookings(vehicleId);
+        if (hasActive) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot delete vehicle with active bookings'
+            })
+        }
+
+        // Delete the vehicle
+        await vehiclesService.deleteVehicle(vehicleId);
+
+        res.status(200).json({
+            success: true,
+            message: 'Vehicle deleted successfully'
+        })
+    } catch (error: any) {
+        console.error('Delete vehicle error:', error)
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            detail: error.detail,
+            stack: error.stack
+        })
+        
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        })
+    }
+}
+
 export const vehiclesController = {
     getVehicles,
     getVehicleById,
     updateVehicle,
-    createVehicle
+    createVehicle,
+    deleteVehicle
 }
 

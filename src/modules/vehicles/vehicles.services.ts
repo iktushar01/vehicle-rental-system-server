@@ -80,10 +80,25 @@ const createVehicle = async (vehicleData: {
     return result.rows[0];
 }
 
+const hasActiveBookings = async (vehicleId: number) => {
+    const result = await pool.query(
+        'SELECT COUNT(*) as count FROM bookings WHERE vehicle_id = $1 AND status = $2',
+        [vehicleId, 'active']
+    );
+    return parseInt(result.rows[0].count) > 0;
+}
+
+const deleteVehicle = async (vehicleId: number) => {
+    const result = await pool.query('DELETE FROM vehicles WHERE id = $1 RETURNING id', [vehicleId]);
+    return result.rows[0];
+}
+
 export const vehiclesService = {
     getVehicles,
     getVehicleById,
     updateVehicle,
-    createVehicle
+    createVehicle,
+    hasActiveBookings,
+    deleteVehicle
 }
 
