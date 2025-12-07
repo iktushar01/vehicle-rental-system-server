@@ -19,7 +19,21 @@ app.use('/v1/bookings', bookingsRoutes)
 
 // Health check route
 app.get('/', logger, (req: Request, res: Response) => {
-  res.send('Hello World!!')
+  res.json({
+    success: true,
+    message: 'Vehicle Rental System API is running',
+    data: {
+      service: 'Vehicle Rental System',
+      version: '1.0.0',
+      status: 'operational',
+      endpoints: {
+        auth: '/v1/auth',
+        users: '/v1/users',
+        vehicles: '/v1/vehicles',
+        bookings: '/v1/bookings'
+      }
+    }
+  })
 })
 
 // 404 handler
